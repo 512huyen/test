@@ -1,0 +1,121 @@
+import { Injectable } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
+import { Response } from 'express';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Customer } from './entities/customer.entity';
+
+@Injectable()
+export class CustomerReportService {
+  constructor(
+    @InjectRepository(Customer)
+    private customerRepository: Repository<Customer>,
+  ) {}
+
+  async exportCustomerReport(response: Response): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Báo cáo quản lý tài khoản');
+
+    // Header
+    worksheet.mergeCells('A1:L1');
+    worksheet.getCell('A1').value = 'BÁO CÁO QUẢN LÝ TÀI KHOẢN';
+    worksheet.getCell('A1').alignment = { horizontal: 'center' };
+    worksheet.getCell('A1').font = { size: 16, bold: true };
+
+    // Thời gian báo cáo
+    worksheet.mergeCells('A2:L2');
+    worksheet.getCell('A2').value = `Thời điểm báo cáo: đến ngày ${new Date().toLocaleDateString()}`;
+    worksheet.getCell('A2').alignment = { horizontal: 'right' };
+    worksheet.getCell('A2').font = { italic: true };
+
+    // Thêm phần Tổng hợp
+    worksheet.mergeCells('A4:B4');
+    worksheet.getCell('A4').value = 'Số lượng tài khoản';
+    worksheet.getCell('A4').font = { bold: true };
+
+    worksheet.getRow(5).values = ['Khách hàng cá nhân', '', '', '', ''];
+    worksheet.getRow(6).values = ['Khách hàng tổ chức', '', '', '', ''];
+    worksheet.getRow(7).values = ['Tổng', '', '', '', ''];
+
+    // Phần chi tiết
+    worksheet.mergeCells('A9:L9');
+    worksheet.getCell('A9').value = 'Chi tiết';
+    worksheet.getCell('A9').alignment = { horizontal: 'left' };
+    worksheet.getCell('A9').font = { bold: true };
+
+    worksheet.mergeCells('A10:L10');
+    worksheet.getCell('A10').value = `Thời điểm báo cáo: đến ngày ${new Date().toLocaleDateString()}`;
+    worksheet.getCell('A10').alignment = { horizontal: 'right' };
+    worksheet.getCell('A10').font = { italic: true };
+
+    // Header của bảng chi tiết
+    const headerRow = worksheet.addRow([
+      'Số tài khoản', 'Tên khách hàng', 'Ngày sinh', 'Giới tính', 'Khu vực', 'Quốc tịch',
+      'Mã số thuế', 'Loại khách hàng', 'Thời gian mở', 'Điểm tín nhiệm', 'Trạng thái tài khoản'
+    ]);
+
+    headerRow.font = { bold: true };
+    headerRow.eachCell((cell) => {
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFCCCCFF' },
+      };
+    });
+
+    // Lấy dữ liệu từ bảng customer
+    const customers = await this.customerRepository.find();
+
+    // Thêm dữ liệu vào bảng
+    customers.forEach((customer) => {
+      const gender = customer.gender === 'male' ? 'Nam' : 'Nữ';
+      const customerType = customer.customer_type === 'personal' ? 'Khách hàng cá nhân' : 'Khách hàng tổ chức';
+      const status = customer.status === 'active' ? 'Active' : 'Inactive';
+
+      const row = worksheet.addRow([
+        customer.number_phone,
+        customer.customer_name,
+        customer.date_of_birth?.toLocaleDateString(),
+        gender,
+        customer.address,
+        customer.national,
+        customer.tax_code || '', // Mã số thuế (nếu có)
+        customerType,
+        customer.created_at?.toLocaleDateString(),
+        customer.credit_score || 'Tốt', // Điểm tín nhiệm (mặc định "Tốt")
+        status,
+      ]);
+
+      row.eachCell((cell) => {
+        cell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
+
+    // Đặt header xuất file
+    response.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    response.setHeader(
+      'Content-Disposition',
+      'attachment; filename=CustomerReport.xlsx',
+    );
+
+    // Xuất file Excel
+    await workbook.xlsx.write(response);
+    response.end();
+  }
+}
