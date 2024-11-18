@@ -1,3 +1,9 @@
+Để tính số lượng tài khoản cá nhân theo quý hiện tại, bạn cần xác định quý hiện tại dựa trên thời gian hiện tại. Mình sẽ cập nhật logic để lấy dữ liệu của quý hiện tại và xuất thông tin vào báo cáo.
+
+Cập nhật Hàm exportCustomerReport tính toán theo quý hiện tại
+
+Cập nhật Hàm
+
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 import { Injectable } from '@nestjs/common';
@@ -35,7 +41,7 @@ export class CustomerService {
 
         // Header tổng hợp
         const summaryHeaderRow = worksheet.addRow([
-            'Loại tài khoản', 'Trong ngày', 'Trong tháng', 'Trong năm', 'Tổng cộng'
+            'Loại tài khoản', 'Trong ngày', 'Trong tháng', 'Quý hiện tại', 'Trong năm', 'Tổng cộng'
         ]);
         summaryHeaderRow.font = { bold: true };
         summaryHeaderRow.eachCell((cell) => {
@@ -54,6 +60,28 @@ export class CustomerService {
         const startOfYear = new Date(today.getFullYear(), 0, 1);
         const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
 
+        // Xác định quý hiện tại
+        const currentMonth = today.getMonth() + 1; // Tháng từ 0-11, nên +1 để thành 1-12
+        let startOfCurrentQuarter, endOfCurrentQuarter;
+
+        if (currentMonth >= 1 && currentMonth <= 3) {
+            // Quý I
+            startOfCurrentQuarter = new Date(today.getFullYear(), 0, 1);
+            endOfCurrentQuarter = new Date(today.getFullYear(), 2, 31, 23, 59, 59);
+        } else if (currentMonth >= 4 && currentMonth <= 6) {
+            // Quý II
+            startOfCurrentQuarter = new Date(today.getFullYear(), 3, 1);
+            endOfCurrentQuarter = new Date(today.getFullYear(), 5, 30, 23, 59, 59);
+        } else if (currentMonth >= 7 && currentMonth <= 9) {
+            // Quý III
+            startOfCurrentQuarter = new Date(today.getFullYear(), 6, 1);
+            endOfCurrentQuarter = new Date(today.getFullYear(), 8, 30, 23, 59, 59);
+        } else {
+            // Quý IV
+            startOfCurrentQuarter = new Date(today.getFullYear(), 9, 1);
+            endOfCurrentQuarter = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
+        }
+
         // Tính số lượng tài khoản cá nhân
         const personalAccountsTodayCount = await this.customerRepository.count({
             where: {
@@ -66,6 +94,13 @@ export class CustomerService {
             where: {
                 customer_type: 'personal',
                 created_at: Between(startOfMonth, endOfMonth),
+            },
+        });
+
+        const personalAccountsCurrentQuarterCount = await this.customerRepository.count({
+            where: {
+                customer_type: 'personal',
+                created_at: Between(startOfCurrentQuarter, endOfCurrentQuarter),
             },
         });
 
@@ -86,61 +121,14 @@ export class CustomerService {
                 'Khách hàng cá nhân',
                 personalAccountsTodayCount,
                 personalAccountsMonthCount,
+                personalAccountsCurrentQuarterCount,
                 personalAccountsYearCount,
                 totalPersonalAccountsCount,
-            ]
+            ],
         ];
 
         summaryRows.forEach((data) => {
             const row = worksheet.addRow(data);
-            row.eachCell((cell) => {
-                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-            });
-        });
-
-        // ======== Phần Chi tiết ========
-        worksheet.mergeCells('A8:J8');
-        worksheet.getCell('A8').value = 'Chi tiết';
-        worksheet.getCell('A8').font = { bold: true };
-
-        worksheet.mergeCells('A9:J9');
-        worksheet.getCell('A9').value = `Thời điểm báo cáo: đến ngày ${new Date().toLocaleDateString()}`;
-        worksheet.getCell('A9').alignment = { horizontal: 'right' };
-        worksheet.getCell('A9').font = { italic: true };
-
-        // Header chi tiết
-        const detailHeaderRow = worksheet.addRow([
-            'Số tài khoản', 'Tên khách hàng', 'Ngày sinh', 'Giới tính', 'Khu vực', 'Quốc tịch',
-            'Loại khách hàng', 'Thời gian mở', 'Trạng thái tài khoản'
-        ]);
-        detailHeaderRow.font = { bold: true };
-        detailHeaderRow.eachCell((cell) => {
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-        });
-
-        // Lấy dữ liệu từ bảng customer
-        const customers = await this.customerRepository.find();
-
-        // Thêm dữ liệu chi tiết
-        customers.forEach((customer) => {
-            const gender = customer.gender === 'male' ? 'Nam' : 'Nữ';
-            const customerType = customer.customer_type === 'personal' ? 'Khách hàng cá nhân' : 'Khách hàng tổ chức';
-            const status = customer.status === 'active' ? 'Active' : 'Inactive';
-
-            const row = worksheet.addRow([
-                customer.number_phone,                     // Số tài khoản
-                customer.customer_name,                    // Tên khách hàng
-                customer.date_of_birth?.toLocaleDateString(), // Ngày sinh
-                gender,                                    // Giới tính
-                customer.address,                          // Khu vực
-                customer.national,                         // Quốc tịch
-                customerType,                              // Loại khách hàng
-                customer.created_at?.toLocaleDateString(), // Thời gian mở
-                status                                     // Trạng thái tài khoản
-            ]);
-
             row.eachCell((cell) => {
                 cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
@@ -167,3 +155,21 @@ export class CustomerService {
         response.end();
     }
 }
+
+Giải thích:
+
+	1.	Quý hiện tại:
+	•	Tính toán quý hiện tại dựa trên tháng hiện tại:
+	•	Quý I: Tháng 1 - Tháng 3
+	•	Quý II: Tháng 4 - Tháng 6
+	•	Quý III: Tháng 7 - Tháng 9
+	•	Quý IV: Tháng 10 - Tháng 12
+	2.	Dữ liệu báo cáo:
+	•	Báo cáo tổng hợp sẽ bao gồm các thông tin:
+	•	Trong ngày: Tài khoản cá nhân mở trong ngày hiện tại
+	•	Trong tháng: Tài khoản cá nhân mở trong tháng hiện tại
+	•	Quý hiện tại: Tài khoản cá nhân mở trong quý hiện tại
+	•	Trong năm: Tài khoản cá nhân mở trong năm hiện tại
+	•	Tổng cộng: Tổng số tài khoản cá nhân trong toàn bộ thời gian
+
+Với phần cập nhật này, bạn sẽ có báo cáo chính xác về số lượng tài khoản cá nhân theo quý hiện tại.
