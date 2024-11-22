@@ -1,0 +1,93 @@
+async exportReport(res: Response): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Báo cáo quản lý dư nợ');
+
+  // Cấu hình các cột
+  sheet.columns = [
+    { header: '', key: 'noi_dung', width: 30 },
+    { header: 'Cá nhân - Có TSBĐ', key: 'ca_nhan_co_tsbd', width: 20 },
+    { header: 'Cá nhân - Không có TSBĐ', key: 'ca_nhan_khong_tsbd', width: 20 },
+    { header: 'Tổ chức - Có TSBĐ', key: 'to_chuc_co_tsbd', width: 20 },
+    { header: 'Tổ chức - Không có TSBĐ', key: 'to_chuc_khong_tsbd', width: 20 },
+  ];
+
+  // Thêm tiêu đề
+  sheet.mergeCells('A1:E1');
+  sheet.getCell('A1').value = 'BÁO CÁO QUẢN LÝ DƯ NỢ';
+  sheet.getCell('A1').alignment = { horizontal: 'center' };
+  sheet.getCell('A1').font = { bold: true, size: 14 };
+
+  sheet.mergeCells('A2:E2');
+  sheet.getCell('A2').value = 'Tổng hợp';
+  sheet.getCell('A2').alignment = { horizontal: 'center' };
+
+  sheet.mergeCells('A3:E3');
+  sheet.getCell('A3').value = 'Thời điểm báo cáo: đến ngày 01/01/2025';
+  sheet.getCell('A3').alignment = { horizontal: 'center' };
+
+  // Thêm dữ liệu bảng đầu tiên
+  const dataRows = [
+    ['Giá trị dự nợ', '', '', '', ''],
+    ['Tỷ lệ tổng giá trị dự nợ', '', '', '', ''],
+    ['Số lượng khoản vay', '', '', '', ''],
+    ['Tỷ lệ tổng số lượng khoản vay', '', '', '', ''],
+  ];
+
+  // Ghi dữ liệu vào bảng và thêm border
+  dataRows.forEach((row, index) => {
+    const addedRow = sheet.addRow(row);
+    addedRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+  });
+
+  // Thêm bảng thứ hai
+  sheet.addRow([]); // Dòng trống
+  sheet.addRow(['Giá trị dự nợ (theo KH)']);
+  const headerRow = sheet.addRow(['', 'Cá nhân', 'Tổ chức', 'Có TSBĐ', 'Không có TSBĐ', 'Tất cả']);
+
+  // Thêm border cho header
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true };
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' },
+    };
+  });
+
+  // Dữ liệu bảng thứ hai
+  const secondTableData = [
+    ['Max', '', '', '', '', ''],
+    ['Min', '', '', '', '', ''],
+    ['Bình quân', '', '', '', '', ''],
+  ];
+
+  secondTableData.forEach((row) => {
+    const addedRow = sheet.addRow(row);
+    addedRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+    });
+  });
+
+  // Xuất file Excel
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  res.setHeader('Content-Disposition', 'attachment; filename=bao_cao_quan_ly_du_no.xlsx');
+
+  await workbook.xlsx.write(res);
+  res.end();
+}
