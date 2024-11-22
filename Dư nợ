@@ -4,28 +4,36 @@ import { Response } from 'express';
 
 @Injectable()
 export class ReportService {
-  async exportReport(res: Response): Promise<void> {
+  async exportDebtReport(res: Response): Promise<void> {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Báo cáo quản lý dư nợ');
 
     // 1. Thêm tiêu đề chính
     sheet.mergeCells('A1:H1');
     sheet.getCell('A1').value = 'BÁO CÁO QUẢN LÝ DƯ NỢ';
-    sheet.getCell('A1').alignment = { horizontal: 'center' };
+    sheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
     sheet.getCell('A1').font = { bold: true, size: 14 };
 
     sheet.mergeCells('A2:H2');
     sheet.getCell('A2').value = 'Tổng hợp';
-    sheet.getCell('A2').alignment = { horizontal: 'center' };
+    sheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
 
     sheet.mergeCells('A3:H3');
     sheet.getCell('A3').value = 'Thời điểm báo cáo: đến ngày 01/01/2025';
-    sheet.getCell('A3').alignment = { horizontal: 'center' };
+    sheet.getCell('A3').alignment = { horizontal: 'center', vertical: 'middle' };
 
-    // 2. Bảng 1
-    sheet.addRow([]);
-    const headerRow1 = sheet.addRow(['Nội dung', 'Cá nhân', '', '', 'Tổ chức', '', '', '']);
-    const subHeaderRow1 = sheet.addRow([
+    // 2. Header cho bảng
+    const headerRow1 = sheet.addRow([
+      'Nội dung',
+      'Cá nhân',
+      '',
+      '',
+      'Tổ chức',
+      '',
+      '',
+      '',
+    ]);
+    const headerRow2 = sheet.addRow([
       '',
       'Có TSBĐ',
       'Không có TSBĐ',
@@ -34,26 +42,53 @@ export class ReportService {
       'Không có TSBĐ',
       '',
     ]);
+    const subHeaderRow = sheet.addRow([
+      '',
+      'Tiêu chuẩn',
+      'Quá hạn',
+      'Tiêu chuẩn',
+      'Quá hạn',
+      'Tiêu chuẩn',
+      'Quá hạn',
+    ]);
 
-    // Gộp các ô header
-    sheet.mergeCells('B5:C5');
-    sheet.mergeCells('E5:F5');
-    sheet.mergeCells('A5:A6');
-    sheet.mergeCells('D5:D6');
-    sheet.mergeCells('G5:G6');
+    // Merge cells
+    sheet.mergeCells('B4:C4');
+    sheet.mergeCells('D4:E4');
+    sheet.mergeCells('F4:G4');
+    sheet.mergeCells('A4:A6');
 
-    // Thêm dữ liệu mẫu cho bảng 1
-    const dataRows1 = [
+    // 3. Thêm dữ liệu mẫu
+    const dataRows = [
       ['Giá trị dự nợ', '', '', '', '', '', '', ''],
       ['Tỷ lệ tổng giá trị dự nợ', '', '', '', '', '', '', ''],
       ['Số lượng khoản vay', '', '', '', '', '', '', ''],
       ['Tỷ lệ tổng số lượng khoản vay', '', '', '', '', '', '', ''],
     ];
-    dataRows1.forEach((row) => sheet.addRow(row));
+    dataRows.forEach((row) => sheet.addRow(row));
 
-    // Thêm border cho bảng 1
+    // 4. Định dạng bảng
+    const headerRows = [headerRow1, headerRow2, subHeaderRow];
+    headerRows.forEach((row) => {
+      row.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: '4F81BD' },
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
+
     sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      if (rowNumber >= 5 && rowNumber <= 10) {
+      if (rowNumber > 6 && rowNumber <= 10) {
         row.eachCell((cell) => {
           cell.border = {
             top: { style: 'thin' },
@@ -65,54 +100,15 @@ export class ReportService {
       }
     });
 
-    // 3. Bảng 2
-    sheet.addRow([]);
-    sheet.addRow(['Giá trị dự nợ']);
-    const headerRow2 = sheet.addRow([
-      '',
-      'Theo KH',
-      '',
-      '',
-      'Theo khoản vay',
-      '',
-      '',
-    ]);
-    const subHeaderRow2 = sheet.addRow(['', 'Cá nhân', 'Tổ chức', '', 'Có TSBĐ', 'Không có TSBĐ', 'Tất cả']);
-
-    // Gộp các ô header bảng 2
-    sheet.mergeCells('B12:C12');
-    sheet.mergeCells('D12:D13');
-    sheet.mergeCells('E12:G12');
-    sheet.mergeCells('A12:A13');
-
-    // Thêm dữ liệu mẫu cho bảng 2
-    const dataRows2 = [
-      ['Max', '', '', '', '', '', '', ''],
-      ['Min', '', '', '', '', '', '', ''],
-      ['Bình quân', '', '', '', '', '', '', ''],
-    ];
-    dataRows2.forEach((row) => sheet.addRow(row));
-
-    // Thêm border cho bảng 2
-    sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      if (rowNumber >= 12 && rowNumber <= 16) {
-        row.eachCell((cell) => {
-          cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' },
-          };
-        });
-      }
-    });
-
-    // 4. Xuất file Excel
+    // 5. Xuất file Excel
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename=bao_cao_quan_ly_du_no.xlsx');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=bao_cao_quan_ly_du_no.xlsx',
+    );
 
     await workbook.xlsx.write(res);
     res.end();
