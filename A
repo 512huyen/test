@@ -1,0 +1,68 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { PaymentSchedule } from './entities/payment_schedule.entity';
+import { Loan } from './entities/loan.entity';
+
+@Injectable()
+export class LoanService {
+  constructor(
+    @InjectRepository(PaymentSchedule)
+    private readonly paymentScheduleRepository: Repository<PaymentSchedule>,
+
+    @InjectRepository(Loan)
+    private readonly loanRepository: Repository<Loan>,
+  ) {}
+
+  // Tìm khoản vay có tổng thanh toán lớn nhất và nhỏ nhất theo borrow_type
+  async getLoanMaxMinPaymentByType(borrowType: number) {
+    // Truy vấn khoản vay có tổng thanh toán lớn nhất theo borrow_type
+    const maxLoan = await this.paymentScheduleRepository
+      .createQueryBuilder('payment_schedule')
+      .leftJoinAndSelect('payment_schedule.loan', 'loan')
+      .select('loan.id', 'loanId')
+      .addSelect('SUM(payment_schedule.amount)', 'totalPayment')
+      .where('loan.borrow_type = :borrowType', { borrowType })
+      .groupBy('loan.id')
+      .orderBy('totalPayment', 'DESC') // Sắp xếp theo tổng thanh toán lớn nhất
+      .getRawOne();
+
+    // Truy vấn khoản vay có tổng thanh toán nhỏ nhất theo borrow_type
+    const minLoan = await this.paymentScheduleRepository
+      .createQueryBuilder('payment_schedule')
+      .leftJoinAndSelect('payment_schedule.loan', 'loan')
+      .select('loan.id', 'loanId')
+      .addSelect('SUM(payment_schedule.amount)', 'totalPayment')
+      .where('loan.borrow_type = :borrowType', { borrowType })
+      .groupBy('loan.id')
+      .orderBy('totalPayment', 'ASC') // Sắp xếp theo tổng thanh toán nhỏ nhất
+      .getRawOne();
+
+    return { maxLoan, minLoan };
+  }
+
+  // Tìm khoản vay có tổng thanh toán lớn nhất và nhỏ nhất không theo borrow_type
+  async getLoanMaxMinPayment() {
+    // Truy vấn khoản vay có tổng thanh toán lớn nhất không theo borrow_type
+    const maxLoan = await this.paymentScheduleRepository
+      .createQueryBuilder('payment_schedule')
+      .leftJoinAndSelect('payment_schedule.loan', 'loan')
+      .select('loan.id', 'loanId')
+      .addSelect('SUM(payment_schedule.amount)', 'totalPayment')
+      .groupBy('loan.id')
+      .orderBy('totalPayment', 'DESC') // Sắp xếp theo tổng thanh toán lớn nhất
+      .getRawOne();
+
+    // Truy vấn khoản vay có tổng thanh toán nhỏ nhất không theo borrow_type
+    const minLoan = await this.paymentScheduleRepository
+      .createQueryBuilder('payment_schedule')
+      .leftJoinAndSelect('payment_schedule.loan', 'loan')
+      .select('loan.id', 'loanId')
+      .addSelect('SUM(payment_schedule.amount)', 'totalPayment')
+      .groupBy('loan.id')
+      .orderBy('totalPayment', 'ASC') // Sắp xếp theo tổng thanh toán nhỏ nhất
+      .getRawOne();
+
+    return { maxLoan, minLoan };
+  }
+}
