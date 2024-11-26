@@ -1,0 +1,56 @@
+import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+
+@Injectable()
+export class PaymentScheduleService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async getCustomerWithMaxLoanByType() {
+    const result = await this.dataSource
+      .createQueryBuilder('payment_schedules', 'paymentSchedules')
+      .select('customers.type', 'customerType')
+      .addSelect('loans.borrower_id', 'customerId')
+      .addSelect('SUM(loans.amount)', 'totalLoan')
+      .innerJoin('loans', 'loans', 'paymentSchedules.loan_id = loans.id')
+      .innerJoin('customers', 'customers', 'loans.borrower_id = customers.id')
+      .groupBy('customers.type')
+      .addGroupBy('loans.borrower_id')
+      .orderBy('customers.type', 'ASC')
+      .addOrderBy('SUM(loans.amount)', 'DESC')
+      .distinctOn(['customers.type'])
+      .getRawMany();
+
+    return result;
+  }
+
+  async getCustomerWithMinLoanByType() {
+    const result = await this.dataSource
+      .createQueryBuilder('payment_schedules', 'paymentSchedules')
+      .select('customers.type', 'customerType')
+      .addSelect('loans.borrower_id', 'customerId')
+      .addSelect('SUM(loans.amount)', 'totalLoan')
+      .innerJoin('loans', 'loans', 'paymentSchedules.loan_id = loans.id')
+      .innerJoin('customers', 'customers', 'loans.borrower_id = customers.id')
+      .groupBy('customers.type')
+      .addGroupBy('loans.borrower_id')
+      .orderBy('customers.type', 'ASC')
+      .addOrderBy('SUM(loans.amount)', 'ASC')
+      .distinctOn(['customers.type'])
+      .getRawMany();
+
+    return result;
+  }
+
+  async getAverageLoanByCustomerType() {
+    const result = await this.dataSource
+      .createQueryBuilder('payment_schedules', 'paymentSchedules')
+      .select('customers.type', 'customerType')
+      .addSelect('AVG(loans.amount)', 'averageLoan')
+      .innerJoin('loans', 'loans', 'paymentSchedules.loan_id = loans.id')
+      .innerJoin('customers', 'customers', 'loans.borrower_id = customers.id')
+      .groupBy('customers.type')
+      .getRawMany();
+
+    return result;
+  }
+}
