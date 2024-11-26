@@ -1,0 +1,54 @@
+import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+
+@Injectable()
+export class PaymentScheduleService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  // 1. Khách hàng có tổng khoản vay lớn nhất theo loại
+  async getCustomerWithMaxLoanByType(customerType: number) {
+    const result = await this.dataSource
+      .createQueryBuilder('payment_schedules', 'paymentSchedules')
+      .select('customers.id', 'customerId') // Lấy ID khách hàng
+      .addSelect('SUM(loans.amount)', 'totalLoan') // Tính tổng khoản vay
+      .innerJoin('loans', 'loans', 'paymentSchedules.loan_id = loans.id') // Kết nối bảng loans
+      .innerJoin('customers', 'customers', 'loans.borrower_id = customers.id') // Kết nối bảng customers
+      .where('customers.type = :customerType', { customerType }) // Lọc theo loại khách hàng
+      .groupBy('customers.id') // Nhóm theo khách hàng
+      .orderBy('SUM(loans.amount)', 'DESC') // Sắp xếp giảm dần theo tổng khoản vay
+      .limit(1) // Chỉ lấy khách hàng đầu tiên
+      .getRawOne();
+
+    return result;
+  }
+
+  // 2. Khách hàng có tổng khoản vay nhỏ nhất theo loại
+  async getCustomerWithMinLoanByType(customerType: number) {
+    const result = await this.dataSource
+      .createQueryBuilder('payment_schedules', 'paymentSchedules')
+      .select('customers.id', 'customerId') // Lấy ID khách hàng
+      .addSelect('SUM(loans.amount)', 'totalLoan') // Tính tổng khoản vay
+      .innerJoin('loans', 'loans', 'paymentSchedules.loan_id = loans.id') // Kết nối bảng loans
+      .innerJoin('customers', 'customers', 'loans.borrower_id = customers.id') // Kết nối bảng customers
+      .where('customers.type = :customerType', { customerType }) // Lọc theo loại khách hàng
+      .groupBy('customers.id') // Nhóm theo khách hàng
+      .orderBy('SUM(loans.amount)', 'ASC') // Sắp xếp tăng dần theo tổng khoản vay
+      .limit(1) // Chỉ lấy khách hàng đầu tiên
+      .getRawOne();
+
+    return result;
+  }
+
+  // 3. Bình quân dự nợ theo loại khách hàng
+  async getAverageLoanByType(customerType: number) {
+    const result = await this.dataSource
+      .createQueryBuilder('payment_schedules', 'paymentSchedules')
+      .select('AVG(loans.amount)', 'averageLoan') // Tính bình quân dự nợ
+      .innerJoin('loans', 'loans', 'paymentSchedules.loan_id = loans.id') // Kết nối bảng loans
+      .innerJoin('customers', 'customers', 'loans.borrower_id = customers.id') // Kết nối bảng customers
+      .where('customers.type = :customerType', { customerType }) // Lọc theo loại khách hàng
+      .getRawOne();
+
+    return result;
+  }
+}
